@@ -30,10 +30,11 @@ type Port struct {
 }
 
 type NodeInfo struct {
-	ID     int    `json:"id"`
-	NodeID int    `json:"node_id"`
-	Key    string `json:"key"`
-	Value  string `json:"value"`
+	ID       int    `json:"id"`
+	NodeID   int    `json:"node_id"`
+	SourceID string `json:"source_id,omitempty"`
+	Key      string `json:"key"`
+	Value    string `json:"value"`
 }
 
 type ParsedLog struct {

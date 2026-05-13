@@ -106,7 +106,7 @@ func (r *Repository) SaveParsedLog(logID int, parsed *models.ParsedLog) error {
 	}
 
 	for _, info := range parsed.NodeInfos {
-		nodeID, exists := nodeIDBySourceID[info.Key]
+		nodeID, exists := nodeIDBySourceID[info.SourceID]
 		if !exists {
 			continue
 		}
@@ -244,4 +244,38 @@ func (r *Repository) GetPortsByNodeID(nodeID int) ([]models.Port, error) {
 	}
 
 	return ports, rows.Err()
+}
+
+func (r *Repository) GetNodeInfoByNodeID(nodeID int) ([]models.NodeInfo, error) {
+	rows, err := r.db.Query(
+		`SELECT id, node_id, key, value
+		 FROM nodes_info
+		 WHERE node_id = $1
+		 ORDER BY key`,
+		nodeID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var infos []models.NodeInfo
+
+	for rows.Next() {
+		var info models.NodeInfo
+
+		err := rows.Scan(
+			&info.ID,
+			&info.NodeID,
+			&info.Key,
+			&info.Value,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		infos = append(infos, info)
+	}
+
+	return infos, rows.Err()
 }

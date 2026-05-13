@@ -6,7 +6,7 @@ import (
 )
 
 func RunMigrations(database *sql.DB) error {
-	query, err := os.ReadFile(".internal/db/migrations")
+	query, err := os.ReadFile("internal/db/migrations.sql")
 	if err != nil {
 		return err
 	}

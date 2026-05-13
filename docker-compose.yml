@@ -1,0 +1,31 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: log_parser
+      POSTGRES_USER: log_parser
+      POSTGRES_PASSWORD: log_parser
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U log_parser -d log_parser"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://log_parser:log_parser@db:5432/log_parser?sslmode=disable
+      PORT: 8080
+      LOG_LEVEL: info
+    ports:
+      - "${PORT:-8080}:8080"
+    volumes:
+      - ./data:/app/data
+
+volumes:
+  postgres_data:
