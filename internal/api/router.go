@@ -5,7 +5,7 @@ import (
 	"net/http"
 )
 
-func NewRouter(repo *db.Repository) *http.ServeMux {
+func NewRouter(repo *db.Repository) http.Handler {
 	router := http.NewServeMux()
 	handler := NewHandler(repo)
 
@@ -16,5 +16,5 @@ func NewRouter(repo *db.Repository) *http.ServeMux {
 	router.HandleFunc("/api/v1/topology/", handler.TopologyHandler)
 	router.HandleFunc("/api/v1/log/", handler.LogHandler)
 
-	return router
+	return LoggingMiddleware(router)
 }

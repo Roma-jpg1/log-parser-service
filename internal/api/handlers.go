@@ -2,6 +2,7 @@ package api
 
 import (
 	"awesomeProject/internal/db"
+	"awesomeProject/internal/models"
 	"awesomeProject/internal/parser"
 	"encoding/json"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type Handler struct {
@@ -26,6 +28,7 @@ type ParseResponse struct {
 }
 
 type ParseRequest struct {
+	Path      string `json:"path"`
 	CSVPath   string `json:"csv_path"`
 	SharpPath string `json:"sharp_path"`
 }
@@ -52,36 +55,54 @@ func (h *Handler) ParseHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.CSVPath == "" {
-		WriteError(w, http.StatusBadRequest, "CSV path is required")
+	if req.Path == "" && req.CSVPath == "" {
+		WriteError(w, http.StatusBadRequest, "path or csv_path is required")
 		return
 	}
 
-	if req.SharpPath == "" {
-		WriteError(w, http.StatusBadRequest, "Sharp path is required")
-		return
-	}
-
-	if !isDataPath(req.CSVPath) || !isDataPath(req.SharpPath) {
+	if !validParsePaths(req) {
 		WriteError(w, http.StatusBadRequest, "log paths must be inside data/")
 		return
 	}
 
-	logID, err := h.repo.CreateLog(req.CSVPath)
+	filename := req.Path
+	if filename == "" {
+		filename = req.CSVPath
+	}
+
+	logID, err := h.repo.CreateLog(filename)
 	if err != nil {
 		WriteError(w, http.StatusInternalServerError, "Failed to create log")
 		return
 	}
 
-	parsed, err := parser.ParseFiles(req.CSVPath, req.SharpPath)
+	parseStarted := time.Now()
+	parsed, err := parseRequestFiles(req)
 	if err != nil {
 		_ = h.repo.MarkLogFailed(logID, err.Error())
+		logJSON(map[string]any{
+			"level":       "error",
+			"event":       "parse",
+			"log_id":      logID,
+			"path":        filename,
+			"duration_ms": time.Since(parseStarted).Milliseconds(),
+			"error":       err.Error(),
+		})
 		WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	parseDuration := time.Since(parseStarted)
 
 	if err := h.repo.SaveParsedLog(logID, parsed); err != nil {
 		_ = h.repo.MarkLogFailed(logID, err.Error())
+		logJSON(map[string]any{
+			"level":       "error",
+			"event":       "parse_save",
+			"log_id":      logID,
+			"path":        filename,
+			"duration_ms": parseDuration.Milliseconds(),
+			"error":       err.Error(),
+		})
 		WriteError(w, http.StatusInternalServerError, "Failed to save parsed log")
 		return
 	}
@@ -90,6 +111,16 @@ func (h *Handler) ParseHandler(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusInternalServerError, "Failed to update log status")
 		return
 	}
+
+	logJSON(map[string]any{
+		"level":       "info",
+		"event":       "parse",
+		"log_id":      logID,
+		"path":        filename,
+		"nodes_count": len(parsed.Nodes),
+		"ports_count": len(parsed.Ports),
+		"duration_ms": parseDuration.Milliseconds(),
+	})
 
 	WriteJson(w, http.StatusOK, ParseResponse{
 		LogID: logID,
@@ -238,4 +269,21 @@ func extractID(path, prefix string) (int, error) {
 func isDataPath(path string) bool {
 	cleanPath := filepath.ToSlash(filepath.Clean(path))
 	return cleanPath == "data" || strings.HasPrefix(cleanPath, "data/")
+}
+
+func validParsePaths(req ParseRequest) bool {
+	if req.Path != "" {
+		return isDataPath(req.Path)
+	}
+	if req.SharpPath != "" {
+		return isDataPath(req.CSVPath) && isDataPath(req.SharpPath)
+	}
+	return isDataPath(req.CSVPath)
+}
+
+func parseRequestFiles(req ParseRequest) (*models.ParsedLog, error) {
+	if req.Path != "" {
+		return parser.ParseArchive(req.Path)
+	}
+	return parser.ParseFiles(req.CSVPath, req.SharpPath)
 }
