@@ -93,7 +93,7 @@ END_PORTS
 
 func TestParseArchive(t *testing.T) {
 	dir := t.TempDir()
-	archivePath := filepath.Join(dir, "logs.zip")
+	archivePath := filepath.Join(dir, "log.zip")
 
 	createTestArchive(t, archivePath, map[string]string{
 		"logs/ibdiagnet2.db_csv": `START_NODES
@@ -127,7 +127,7 @@ endianness = 0
 
 func TestParseArchiveRejectsUnsafePath(t *testing.T) {
 	dir := t.TempDir()
-	archivePath := filepath.Join(dir, "logs.zip")
+	archivePath := filepath.Join(dir, "log.zip")
 
 	createTestArchive(t, archivePath, map[string]string{
 		"../ibdiagnet2.db_csv": "unsafe",

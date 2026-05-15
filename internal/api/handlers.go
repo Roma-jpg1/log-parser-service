@@ -140,6 +140,11 @@ func (h *Handler) TopologyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if _, err := h.repo.GetLogByID(logID); err != nil {
+		WriteError(w, http.StatusNotFound, "Log not found")
+		return
+	}
+
 	nodes, err := h.repo.GetNodesByLogID(logID)
 	if err != nil {
 		WriteError(w, http.StatusInternalServerError, "Failed to get topology")
@@ -163,6 +168,7 @@ func (h *Handler) TopologyHandler(w http.ResponseWriter, r *http.Request) {
 		"log_id": logID,
 		"nodes":  nodes,
 		"groups": groups,
+		"edges":  []any{},
 	})
 }
 
